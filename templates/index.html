@@ -48,8 +48,8 @@
 
         .container {
             display: flex;
-            width: 80%;
-            max-width: 950px;
+            width: 85%;
+            max-width: 1050px;
             background: white;
             box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
             border-radius: 10px;
@@ -127,9 +127,10 @@
             text-align: center;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             background: #fafafa;
             position: relative;
+            overflow-y: auto;
         }
 
         .aqi-result {
@@ -173,13 +174,18 @@
             color: black;
         }
 
-        .unhealthy {
+        .unhealthy-sensitive {
             background: #ff9800;
             color: white;
         }
 
+        .unhealthy {
+            background: #f44336;
+            color: white;
+        }
+
         .very-unhealthy {
-            background: #d32f2f;
+            background: #9c27b0;
             color: white;
         }
 
@@ -192,11 +198,99 @@
             display: none;
             max-width: 100%;
             margin-top: 15px;
+            margin-bottom: 15px;
+        }
+
+        .recommendations {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background: #f5f5f5;
+            animation: fadeIn 0.5s ease-in-out;
+            text-align: left;
+        }
+
+        .recommendations h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .recommendation-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .recommendation-icon {
+            font-size: 24px;
+            margin-right: 10px;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        .recommendation-text {
+            flex: 1;
+        }
+
+        .aqi-scale {
+            display: flex;
+            margin-top: 15px;
+            border-radius: 5px;
+            overflow: hidden;
+            height: 20px;
+        }
+
+        .scale-segment {
+            height: 100%;
+            flex: 1;
+        }
+
+        .scale-good {
+            background: #81c784;
+        }
+
+        .scale-moderate {
+            background: #ffeb3b;
+        }
+
+        .scale-unhealthy-sensitive {
+            background: #ff9800;
+        }
+
+        .scale-unhealthy {
+            background: #f44336;
+        }
+
+        .scale-very-unhealthy {
+            background: #9c27b0;
+        }
+
+        .scale-hazardous {
+            background: #4a148c;
+        }
+
+        .scale-marker {
+            position: relative;
+            height: 0;
+            width: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid black;
+            margin-top: -10px;
+            transition: left 0.5s ease-in-out;
         }
 
         @media (max-width: 768px) {
             .container {
                 flex-direction: column;
+                height: 90vh;
+            }
+
+            .input-section,
+            .output-section {
+                overflow-y: auto;
             }
         }
     </style>
@@ -251,7 +345,20 @@
             <h2>Predicted AQI</h2>
             <div class="aqi-result" id="aqi-value">--</div>
             <div id="aqi-box" class="aqi-box"></div>
+            <div class="aqi-scale" id="aqi-scale">
+                <div class="scale-segment scale-good"></div>
+                <div class="scale-segment scale-moderate"></div>
+                <div class="scale-segment scale-unhealthy-sensitive"></div>
+                <div class="scale-segment scale-unhealthy"></div>
+                <div class="scale-segment scale-very-unhealthy"></div>
+                <div class="scale-segment scale-hazardous"></div>
+            </div>
+            <div class="scale-marker" id="scale-marker"></div>
             <canvas id="aqi-chart"></canvas>
+            <div id="recommendations" class="recommendations">
+                <h3>Health Recommendations</h3>
+                <div id="recommendation-content"></div>
+            </div>
         </div>
     </div>
 
@@ -260,6 +367,8 @@
             $("#aqi-value").text("--");
             $("#aqi-box").hide();
             $("#aqi-chart").hide();
+            $("#recommendations").hide();
+            $("#scale-marker").css("left", "0%");
         });
 
         $("#predict-form").submit(function (event) {
@@ -271,22 +380,201 @@
                 success: function (response) {
                     let aqi = response.predicted_AQI;
                     $("#aqi-value").text(aqi);
-                    let box = $("#aqi-box").removeClass().addClass("aqi-box").show();
-                    let text = aqi <= 50 ? "Good Air 🌿" : aqi <= 100 ? "Moderate 🤔" : "Unhealthy ⚠️";
-                    box.text(text).addClass(aqi <= 50 ? "good" : aqi <= 100 ? "moderate" : "unhealthy");
 
+                    let box = $("#aqi-box").removeClass().addClass("aqi-box").show();
+                    let categoryText, categoryClass;
+
+                    if (aqi <= 50) {
+                        categoryText = "Good Air Quality 🌿";
+                        categoryClass = "good";
+                    } else if (aqi <= 100) {
+                        categoryText = "Moderate Air Quality 🤔";
+                        categoryClass = "moderate";
+                    } else if (aqi <= 150) {
+                        categoryText = "Unhealthy for Sensitive Groups ⚠️";
+                        categoryClass = "unhealthy-sensitive";
+                    } else if (aqi <= 200) {
+                        categoryText = "Unhealthy Air Quality 😷";
+                        categoryClass = "unhealthy";
+                    } else if (aqi <= 300) {
+                        categoryText = "Very Unhealthy Air Quality ❗";
+                        categoryClass = "very-unhealthy";
+                    } else {
+                        categoryText = "Hazardous Air Quality ☠️";
+                        categoryClass = "hazardous";
+                    }
+
+                    box.text(categoryText).addClass(categoryClass);
+
+                    // Set the scale marker position
+                    let scalePosition = Math.min(aqi / 500 * 100, 100);
+                    $("#scale-marker").css("left", scalePosition + "%");
+
+                    // Display recommendations
+                    let recommendations = getRecommendations(aqi);
+                    $("#recommendation-content").html(recommendations);
+                    $("#recommendations").show();
+
+                    // Display chart
                     $("#aqi-chart").show();
                     let ctx = document.getElementById("aqi-chart").getContext("2d");
+
+                    // Determine color based on AQI
+                    let barColor;
+                    if (aqi <= 50) barColor = "#81c784";
+                    else if (aqi <= 100) barColor = "#ffeb3b";
+                    else if (aqi <= 150) barColor = "#ff9800";
+                    else if (aqi <= 200) barColor = "#f44336";
+                    else if (aqi <= 300) barColor = "#9c27b0";
+                    else barColor = "#4a148c";
+
                     new Chart(ctx, {
                         type: "bar",
                         data: {
                             labels: ["AQI"],
-                            datasets: [{ label: "Air Quality Index", data: [aqi], backgroundColor: ["#0288d1"] }]
+                            datasets: [{
+                                label: "Air Quality Index",
+                                data: [aqi],
+                                backgroundColor: [barColor],
+                                borderColor: [barColor],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: Math.max(300, aqi + 50)
+                                }
+                            }
                         }
                     });
                 }
             });
         });
+
+        function getRecommendations(aqi) {
+            let recommendations = "";
+
+            if (aqi <= 50) {
+                recommendations = `
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🏃</div>
+                        <div class="recommendation-text">Enjoy outdoor activities</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🌳</div>
+                        <div class="recommendation-text">Ideal for outdoor exercise</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🌞</div>
+                        <div class="recommendation-text">Open windows for fresh air</div>
+                    </div>
+                `;
+            } else if (aqi <= 100) {
+                recommendations = `
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">⚠️</div>
+                        <div class="recommendation-text">Unusually sensitive people should consider reducing prolonged outdoor exertion</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">👨‍👩‍👧‍👦</div>
+                        <div class="recommendation-text">Most people can still engage in outdoor activities</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🌡️</div>
+                        <div class="recommendation-text">Monitor symptoms like coughing or shortness of breath</div>
+                    </div>
+                `;
+
+            } else if (aqi <= 150) {
+                recommendations = `
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🫁</div>
+                        <div class="recommendation-text">People with respiratory or heart conditions, the elderly and children should limit prolonged outdoor exertion</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">⏱️</div>
+                        <div class="recommendation-text">Consider reducing outdoor activities, especially if you experience symptoms</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🚶</div>
+                        <div class="recommendation-text">Keep outdoor activities short and less intense</div>
+                    </div>
+                `;
+            } else if (aqi <= 200) {
+                recommendations = `
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">❗</div>
+                        <div class="recommendation-text">Everyone should reduce prolonged or heavy exertion outdoors</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">😷</div>
+                        <div class="recommendation-text">Consider wearing masks outdoors (N95 or similar)</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🏠</div>
+                        <div class="recommendation-text">Keep windows closed and use air purifiers if available</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">⚕️</div>
+                        <div class="recommendation-text">Sensitive groups should avoid all outdoor physical activities</div>
+                    </div>
+                `;
+            } else if (aqi <= 300) {
+                recommendations = `
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🚫</div>
+                        <div class="recommendation-text">Avoid all outdoor activities</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🏠</div>
+                        <div class="recommendation-text">Stay indoors with windows and doors closed</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🔄</div>
+                        <div class="recommendation-text">Run air purifiers if available</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">😷</div>
+                        <div class="recommendation-text">Wear masks when outdoors (N95 or equivalent)</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">⚕️</div>
+                        <div class="recommendation-text">Seek medical attention if experiencing respiratory distress</div>
+                    </div>
+                `;
+            } else {
+                recommendations = `
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">⚠️</div>
+                        <div class="recommendation-text">Health Alert: Everyone may experience serious health effects</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🏠</div>
+                        <div class="recommendation-text">Stay indoors with windows and doors closed tightly</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🔄</div>
+                        <div class="recommendation-text">Run air purifiers on highest setting</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">😷</div>
+                        <div class="recommendation-text">Wear N95 masks if you must go outside</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">⚕️</div>
+                        <div class="recommendation-text">Consider relocating temporarily if conditions persist</div>
+                    </div>
+                    <div class="recommendation-item">
+                        <div class="recommendation-icon">🚑</div>
+                        <div class="recommendation-text">Seek immediate medical attention for respiratory symptoms</div>
+                    </div>
+                `;
+            }
+
+            return recommendations;
+        }
     </script>
 </body>
 
