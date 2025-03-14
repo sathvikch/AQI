@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AQI Prediction</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to bottom, #e0f7fa, #80deea);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .background-design {
+            position: absolute;
+            font-size: 100px;
+            opacity: 0.2;
+            color: white;
+            pointer-events: none;
+        }
+
+        .bg1 {
+            top: 10%;
+            left: 5%;
+            transform: rotate(-15deg);
+        }
+
+        .bg2 {
+            bottom: 15%;
+            right: 10%;
+            transform: rotate(20deg);
+        }
+
+        .bg3 {
+            top: 50%;
+            left: 50%;
+            transform: rotate(-10deg);
+        }
+
+        .container {
+            display: flex;
+            width: 80%;
+            max-width: 950px;
+            background: white;
+            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .input-section,
+        .output-section {
+            flex: 1;
+            padding: 20px;
+        }
+
+        .input-section {
+            background: #e3f2fd;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 22px;
+            margin-bottom: 10px;
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .form-group label {
+            flex: 1;
+        }
+
+        .form-group select,
+        .form-group input {
+            flex: 2;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            background: #0288d1;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #0277bd;
+            transform: scale(1.05);
+        }
+
+        .output-section {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: #fafafa;
+            position: relative;
+        }
+
+        .aqi-result {
+            font-size: 28px;
+            font-weight: bold;
+            margin: 10px 0;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .aqi-box {
+            padding: 15px;
+            font-size: 18px;
+            border-radius: 5px;
+            margin-top: 10px;
+            text-align: center;
+            width: 80%;
+            margin-left: auto;
+            margin-right: auto;
+            display: none;
+        }
+
+        .good {
+            background: #81c784;
+            color: white;
+        }
+
+        .moderate {
+            background: #ffeb3b;
+            color: black;
+        }
+
+        .unhealthy {
+            background: #ff9800;
+            color: white;
+        }
+
+        .very-unhealthy {
+            background: #d32f2f;
+            color: white;
+        }
+
+        .hazardous {
+            background: #4a148c;
+            color: white;
+        }
+
+        canvas {
+            display: none;
+            max-width: 100%;
+            margin-top: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="background-design bg1">🌫️</div>
+    <div class="background-design bg2">💨</div>
+    <div class="background-design bg3">🏭</div>
+
+    <div class="container">
+        <div class="input-section">
+            <h1>🌍 AQI Prediction</h1>
+            <form id="predict-form">
+                <div class="form-group">
+                    <label>Select City:</label>
+                    <select id="city" name="city">
+                        {% for city in cities %}
+                        <option value="{{ city }}">{{ city }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>PM2.5:</label>
+                    <input type="number" step="0.1" name="PM2.5" required>
+                </div>
+                <div class="form-group">
+                    <label>PM10:</label>
+                    <input type="number" step="0.1" name="PM10" required>
+                </div>
+                <div class="form-group">
+                    <label>NO2:</label>
+                    <input type="number" step="0.1" name="NO2" required>
+                </div>
+                <div class="form-group">
+                    <label>SO2:</label>
+                    <input type="number" step="0.1" name="SO2" required>
+                </div>
+                <div class="form-group">
+                    <label>CO:</label>
+                    <input type="number" step="0.1" name="CO" required>
+                </div>
+                <div class="form-group">
+                    <label>O3:</label>
+                    <input type="number" step="0.1" name="O3" required>
+                </div>
+                <button type="submit">Predict AQI</button>
+            </form>
+        </div>
+
+        <div class="output-section">
+            <h2>Predicted AQI</h2>
+            <div class="aqi-result" id="aqi-value">--</div>
+            <div id="aqi-box" class="aqi-box"></div>
+            <canvas id="aqi-chart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        $("#predict-form").on("input change", function () {
+            $("#aqi-value").text("--");
+            $("#aqi-box").hide();
+            $("#aqi-chart").hide();
+        });
+
+        $("#predict-form").submit(function (event) {
+            event.preventDefault();
+            $.ajax({
+                url: "/predict",
+                type: "POST",
+                data: $("#predict-form").serialize(),
+                success: function (response) {
+                    let aqi = response.predicted_AQI;
+                    $("#aqi-value").text(aqi);
+                    let box = $("#aqi-box").removeClass().addClass("aqi-box").show();
+                    let text = aqi <= 50 ? "Good Air 🌿" : aqi <= 100 ? "Moderate 🤔" : "Unhealthy ⚠️";
+                    box.text(text).addClass(aqi <= 50 ? "good" : aqi <= 100 ? "moderate" : "unhealthy");
+
+                    $("#aqi-chart").show();
+                    let ctx = document.getElementById("aqi-chart").getContext("2d");
+                    new Chart(ctx, {
+                        type: "bar",
+                        data: {
+                            labels: ["AQI"],
+                            datasets: [{ label: "Air Quality Index", data: [aqi], backgroundColor: ["#0288d1"] }]
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
